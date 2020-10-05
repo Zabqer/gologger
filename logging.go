@@ -24,7 +24,7 @@ type Logger struct {
 	lock       sync.Mutex
 }
 
-func MakeLogger() *Logger {
+func NewLogger() *Logger {
 	simple := false
 	writeLevel := LOG_DEBUG
 
