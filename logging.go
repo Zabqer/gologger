@@ -20,6 +20,7 @@ type Logger struct {
 	simple     *bool
 	file       *os.File
 	writeLevel *int
+	tagAlign   *int
 	name       string
 	lock       sync.Mutex
 }
@@ -27,20 +28,23 @@ type Logger struct {
 func NewLogger() *Logger {
 	simple := false
 	writeLevel := LOG_DEBUG
+	tagAlign := 0
 
 	return &Logger{
 		simple:     &simple,
 		file:       nil,
 		writeLevel: &writeLevel,
+		tagAlign:   &tagAlign,
 		name:       "main",
 	}
 }
 
-func (lg *Logger) Module(name string) *Logger {
+func (l *Logger) Module(name string) *Logger {
 	return &Logger{
-		simple:     lg.simple,
-		file:       lg.file,
-		writeLevel: lg.writeLevel,
+		simple:     l.simple,
+		file:       l.file,
+		writeLevel: l.writeLevel,
+		tagAlign:   l.tagAlign,
 		name:       name,
 	}
 }
@@ -64,6 +68,11 @@ func (l *Logger) SetFile(path string) error {
 	return nil
 }
 
+func (l *Logger) SetTagAlign(n int) *Logger {
+	*l.tagAlign = n
+	return l
+}
+
 func formatLevel(level int) string {
 	switch level {
 	case LOG_DEBUG:
@@ -85,11 +94,17 @@ func (l *Logger) formatMessage(level int, message []interface{}) string {
 		msgs = append(msgs, fmt.Sprintf("%v", d))
 	}
 	now := time.Now()
+	var tag string
+	if *l.tagAlign != 0 && *l.tagAlign > len(l.name) {
+		tag = l.name + strings.Repeat(" ", *l.tagAlign-len(l.name))
+	} else {
+		tag = l.name
+	}
 	if *l.simple {
-		return fmt.Sprintf("[%s] [%s] %s %s", now.Format("15:04:05"), l.name, formatLevel(level), strings.Join(msgs, " "))
+		return fmt.Sprintf("[%s] [%s] %s %s", now.Format("15:04:05"), tag, formatLevel(level), strings.Join(msgs, " "))
 	} else {
 		pc, _, line, _ := runtime.Caller(3)
-		return fmt.Sprintf("[%s] [%s] %s [%s:%d] %s", now.Format("2006/01/02 15:04:05.0000"), l.name, formatLevel(level), runtime.FuncForPC(pc).Name(), line, strings.Join(msgs, " "))
+		return fmt.Sprintf("[%s] [%s] %s [%s:%d] %s", now.Format("2006/01/02 15:04:05.0000"), tag, formatLevel(level), runtime.FuncForPC(pc).Name(), line, strings.Join(msgs, " "))
 	}
 }
 
