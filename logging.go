@@ -2,8 +2,10 @@ package gologger
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -89,23 +91,37 @@ func formatLevel(level int) string {
 }
 
 func (l *Logger) formatMessage(level int, message []interface{}) string {
-	var msgs []string
-	for _, d := range message {
-		msgs = append(msgs, fmt.Sprintf("%v", d))
-	}
 	now := time.Now()
-	var tag string
-	if *l.tagAlign != 0 && *l.tagAlign > len(l.name) {
-		tag = l.name + strings.Repeat(" ", *l.tagAlign-len(l.name))
-	} else {
-		tag = l.name
-	}
+	var builder strings.Builder
+	builder.WriteRune('[')
 	if *l.simple {
-		return fmt.Sprintf("[%s] [%s] %s %s", now.Format("15:04:05"), tag, formatLevel(level), strings.Join(msgs, " "))
+		builder.WriteString(now.Format("15:04:05"))
 	} else {
-		pc, _, line, _ := runtime.Caller(3)
-		return fmt.Sprintf("[%s] [%s] %s [%s:%d] %s", now.Format("2006/01/02 15:04:05.0000"), tag, formatLevel(level), runtime.FuncForPC(pc).Name(), line, strings.Join(msgs, " "))
+		builder.WriteString(now.Format("2006/01/02 15:04:05.0000"))
 	}
+	builder.WriteString("] [")
+	if *l.tagAlign != 0 && *l.tagAlign > len(l.name) {
+		builder.WriteString(strings.Repeat(" ", int(math.Floor(float64(*l.tagAlign-len(l.name))/2))))
+		builder.WriteString(l.name)
+		builder.WriteString(strings.Repeat(" ", int(math.Ceil(float64(*l.tagAlign-len(l.name))/2))))
+	} else {
+		builder.WriteString(l.name)
+	}
+	builder.WriteString("] ")
+	builder.WriteString(formatLevel(level))
+	builder.WriteRune(' ')
+	if !*l.simple {
+		builder.WriteRune('[')
+		pc, _, line, _ := runtime.Caller(3)
+		builder.WriteString(runtime.FuncForPC(pc).Name())
+		builder.WriteRune(':')
+		builder.WriteString(strconv.Itoa(line))
+		builder.WriteString("] ")
+	}
+	for _, d := range message {
+		builder.WriteString(fmt.Sprintf("%v", d))
+	}
+	return builder.String()
 }
 
 func (l *Logger) Log(level int, message ...interface{}) {
