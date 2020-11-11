@@ -19,45 +19,45 @@ const (
 )
 
 type Logger struct {
-	simple     *bool
-	file       *os.File
-	writeLevel *int
-	tagAlign   *int
-	name       string
-	lock       sync.Mutex
+	file   *os.File
+	name   string
+	lock   sync.Mutex
+	config *logConfig
+}
+
+type logConfig struct {
+	simple     bool
+	writeLevel int
+	tagAlign   int
 }
 
 func NewLogger() *Logger {
-	simple := false
-	writeLevel := LOG_DEBUG
-	tagAlign := 0
-
 	return &Logger{
-		simple:     &simple,
-		file:       nil,
-		writeLevel: &writeLevel,
-		tagAlign:   &tagAlign,
-		name:       "main",
+		file: nil,
+		name: "main",
+		config: &logConfig{
+			simple:     false,
+			writeLevel: LOG_DEBUG,
+			tagAlign:   0,
+		},
 	}
 }
 
 func (l *Logger) Module(name string) *Logger {
 	return &Logger{
-		simple:     l.simple,
-		file:       l.file,
-		writeLevel: l.writeLevel,
-		tagAlign:   l.tagAlign,
-		name:       name,
+		file:   l.file,
+		name:   name,
+		config: l.config,
 	}
 }
 
 func (l *Logger) SetLevel(level int) *Logger {
-	*l.writeLevel = level
+	l.config.writeLevel = level
 	return l
 }
 
 func (l *Logger) SetSimple(simple bool) *Logger {
-	*l.simple = simple
+	l.config.simple = simple
 	return l
 }
 
@@ -71,7 +71,7 @@ func (l *Logger) SetFile(path string) error {
 }
 
 func (l *Logger) SetTagAlign(n int) *Logger {
-	*l.tagAlign = n
+	l.config.tagAlign = n
 	return l
 }
 
@@ -94,23 +94,23 @@ func (l *Logger) formatMessage(level int, message []interface{}) string {
 	now := time.Now()
 	var builder strings.Builder
 	builder.WriteRune('[')
-	if *l.simple {
+	if l.config.simple {
 		builder.WriteString(now.Format("15:04:05"))
 	} else {
 		builder.WriteString(now.Format("2006/01/02 15:04:05.0000"))
 	}
 	builder.WriteString("] [")
-	if *l.tagAlign != 0 && *l.tagAlign > len(l.name) {
-		builder.WriteString(strings.Repeat(" ", int(math.Floor(float64(*l.tagAlign-len(l.name))/2))))
+	if l.config.tagAlign != 0 && l.config.tagAlign > len(l.name) {
+		builder.WriteString(strings.Repeat(" ", int(math.Floor(float64(l.config.tagAlign-len(l.name))/2))))
 		builder.WriteString(l.name)
-		builder.WriteString(strings.Repeat(" ", int(math.Ceil(float64(*l.tagAlign-len(l.name))/2))))
+		builder.WriteString(strings.Repeat(" ", int(math.Ceil(float64(l.config.tagAlign-len(l.name))/2))))
 	} else {
 		builder.WriteString(l.name)
 	}
 	builder.WriteString("] ")
 	builder.WriteString(formatLevel(level))
 	builder.WriteRune(' ')
-	if !*l.simple {
+	if !l.config.simple {
 		builder.WriteRune('[')
 		pc, _, line, _ := runtime.Caller(3)
 		builder.WriteString(runtime.FuncForPC(pc).Name())
@@ -125,7 +125,7 @@ func (l *Logger) formatMessage(level int, message []interface{}) string {
 }
 
 func (l *Logger) Log(level int, message ...interface{}) {
-	if level < *l.writeLevel {
+	if level < l.config.writeLevel {
 		return
 	}
 	l.lock.Lock()
