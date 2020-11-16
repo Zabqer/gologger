@@ -118,8 +118,11 @@ func (l *Logger) formatMessage(level int, message []interface{}) string {
 		builder.WriteString(strconv.Itoa(line))
 		builder.WriteString("] ")
 	}
-	for _, d := range message {
+	for i, d := range message {
 		builder.WriteString(fmt.Sprintf("%v", d))
+		if i != len(message)-1 {
+			builder.WriteRune(' ')
+		}
 	}
 	return builder.String()
 }
