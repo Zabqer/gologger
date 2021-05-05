@@ -2,6 +2,7 @@ package gologger
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"runtime"
@@ -19,7 +20,7 @@ const (
 )
 
 type Logger struct {
-	file   *os.File
+	writer io.WriteCloser
 	name   string
 	lock   sync.Mutex
 	config *logConfig
@@ -33,8 +34,8 @@ type logConfig struct {
 
 func NewLogger() *Logger {
 	return &Logger{
-		file: nil,
-		name: "main",
+		writer: nil,
+		name:   "main",
 		config: &logConfig{
 			simple:     false,
 			writeLevel: LOG_DEBUG,
@@ -45,7 +46,7 @@ func NewLogger() *Logger {
 
 func (l *Logger) Module(name string) *Logger {
 	return &Logger{
-		file:   l.file,
+		writer: l.writer,
 		name:   name,
 		config: l.config,
 	}
@@ -62,12 +63,17 @@ func (l *Logger) SetSimple(simple bool) *Logger {
 }
 
 func (l *Logger) SetFile(path string) error {
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o755)
 	if err != nil {
 		return err
 	}
-	l.file = file
+	l.writer = file
 	return nil
+}
+
+func (l *Logger) SetWriter(writer io.WriteCloser) *Logger {
+	l.writer = writer
+	return l
 }
 
 func (l *Logger) SetTagAlign(n int) *Logger {
@@ -135,8 +141,8 @@ func (l *Logger) Log(level int, message ...interface{}) {
 	defer l.lock.Unlock()
 	mess := l.formatMessage(level, message)
 	fmt.Println(mess)
-	if l.file != nil {
-		l.file.WriteString(mess + "\n")
+	if l.writer != nil {
+		l.writer.Write([]byte(mess + "\n"))
 	}
 }
 
@@ -157,7 +163,7 @@ func (l *Logger) Error(message ...interface{}) {
 }
 
 func (l *Logger) Close() {
-	if l.file != nil {
-		l.file.Close()
+	if l.writer != nil {
+		l.writer.Close()
 	}
 }
